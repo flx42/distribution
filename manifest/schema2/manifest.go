@@ -84,6 +84,11 @@ func (m Manifest) Target() distribution.Descriptor {
 	return m.Config
 }
 
+// Canonicalize returns the canonical JSON representation
+func (m Manifest) Canonicalize() ([]byte, error) {
+	return json.MarshalIndent(&m, "", "   ")
+}
+
 // DeserializedManifest wraps Manifest with a copy of the original JSON.
 // It satisfies the distribution.Manifest interface.
 type DeserializedManifest struct {
@@ -100,23 +105,25 @@ func FromStruct(m Manifest) (*DeserializedManifest, error) {
 	deserialized.Manifest = m
 
 	var err error
-	deserialized.canonical, err = json.MarshalIndent(&m, "", "   ")
+	deserialized.canonical, err = m.Canonicalize()
 	return &deserialized, err
 }
 
 // UnmarshalJSON populates a new Manifest struct from JSON data.
 func (m *DeserializedManifest) UnmarshalJSON(b []byte) error {
-	m.canonical = make([]byte, len(b), len(b))
-	// store manifest in canonical
-	copy(m.canonical, b)
-
 	// Unmarshal canonical JSON into Manifest object
 	var manifest Manifest
-	if err := json.Unmarshal(m.canonical, &manifest); err != nil {
+	if err := json.Unmarshal(b, &manifest); err != nil {
 		return err
 	}
 
 	m.Manifest = manifest
+
+	var err error
+	m.canonical, err = m.Manifest.Canonicalize()
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
